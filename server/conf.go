@@ -17,9 +17,9 @@ var confString = `
 debug: false
 commit: 0
 port: 5000
-title: Go Starter Kit
+title: Iris Starter Kit
 api:
   prefix: /api
 duktape:
-  path: static/build/bundle.js
+  path: data/static/build/bundle.js
 `

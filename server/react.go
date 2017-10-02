@@ -10,10 +10,12 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/kataras/iris"
+
 	"github.com/dop251/goja"
 	"github.com/dop251/goja_nodejs/eventloop"
+
 	"github.com/fatih/structs"
-	"github.com/labstack/echo"
 	"github.com/nu7hatch/gouuid"
 	"github.com/olebedev/gojax/fetch"
 )
@@ -51,14 +53,16 @@ func NewReact(filePath string, debug bool, proxy http.Handler) *React {
 // Handle handles all HTTP requests which
 // have not been caught via static file
 // handler or other middlewares.
-func (r *React) Handle(c echo.Context) error {
-	UUID := c.Get("uuid").(*uuid.UUID)
+func (r *React) Handle(ctx iris.Context) {
+	UUID := ctx.Values().Get("uuid").(*uuid.UUID)
 	defer func() {
 		if r := recover(); r != nil {
-			c.Render(http.StatusInternalServerError, "react.html", Resp{
+			ctx.StatusCode(iris.StatusInternalServerError)
+			ctx.ViewData("", Resp{
 				UUID:  UUID.String(),
 				Error: r.(string),
 			})
+			ctx.View("react.html")
 		}
 	}()
 
@@ -67,8 +71,8 @@ func (r *React) Handle(c echo.Context) error {
 	start := time.Now()
 	select {
 	case re := <-vm.Handle(map[string]interface{}{
-		"url":     c.Request().URL.String(),
-		"headers": map[string][]string(c.Request().Header),
+		"url":     ctx.Request().URL.String(),
+		"headers": map[string][]string(ctx.Request().Header),
 		"uuid":    UUID.String(),
 	}):
 		// Return vm back to the pool
@@ -76,28 +80,32 @@ func (r *React) Handle(c echo.Context) error {
 
 		re.RenderTime = time.Since(start)
 
-		// Handle the Response
-		if len(re.Redirect) == 0 && len(re.Error) == 0 {
-			// If no redirection and no errors
-			c.Response().Header().Set("X-React-Render-Time", re.RenderTime.String())
-			return c.Render(http.StatusOK, "react.html", re)
-			// If redirect
-		} else if len(re.Redirect) != 0 {
-			return c.Redirect(http.StatusMovedPermanently, re.Redirect)
-			// If internal error
-		} else if len(re.Error) != 0 {
-			c.Response().Header().Set("X-React-Render-Time", re.RenderTime.String())
-			return c.Render(http.StatusInternalServerError, "react.html", re)
+		// If redirect
+		if len(re.Redirect) != 0 {
+			ctx.Redirect(re.Redirect, iris.StatusMovedPermanently)
+			return
 		}
+
+		// If no redirection and no errors
+		ctx.Header("X-React-Render-Time", re.RenderTime.String())
+		ctx.ViewData("", re)
+		ctx.View("react.html")
+
+		if len(re.Error) != 0 {
+			ctx.StatusCode(iris.StatusInternalServerError)
+			return
+		}
+
 	case <-time.After(2 * time.Second):
 		// release the context
 		r.drop(vm)
-		return c.Render(http.StatusInternalServerError, "react.html", Resp{
+		ctx.StatusCode(iris.StatusInternalServerError)
+		ctx.ViewData("", Resp{
 			UUID:  UUID.String(),
 			Error: "timeout",
 		})
+		ctx.View("react.html")
 	}
-	return nil
 }
 
 // Resp is a struct for convinient

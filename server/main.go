@@ -32,7 +32,7 @@ func Run(args []string) {
 // main server.App
 func RunServer(c *cli.Context) {
 	app := NewApp(AppOptions{
-	// see server/app.go:150
+	// see server/app.go:128
 	})
 	app.Run()
 }

@@ -1,14 +1,10 @@
 package main
 
 import (
-	"html/template"
-	"io"
-	"net/http"
+	"github.com/kataras/iris"
+	"github.com/kataras/iris/middleware/logger"
+	"github.com/kataras/iris/middleware/recover"
 
-	"github.com/elazarl/go-bindata-assetfs"
-	"github.com/itsjamie/go-bindata-templates"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
 	"github.com/nu7hatch/gouuid"
 	"github.com/olebedev/config"
 )
@@ -18,7 +14,7 @@ import (
 // all variables defined locally inside
 // this struct.
 type App struct {
-	Engine *echo.Echo
+	Server *iris.Application
 	Conf   *config.Config
 	React  *React
 	API    *API
@@ -49,111 +45,84 @@ func NewApp(opts ...AppOptions) *App {
 	conf.Env()
 
 	// Make an engine
-	engine := echo.New()
+	srv := iris.New()
 
 	// Use precompiled embedded templates
-	engine.Renderer = NewTemplate()
+	srv.RegisterView(iris.HTML("./data/templates", ".html").Binary(Asset, AssetNames))
 
-	// Set up echo debug level
-	engine.Debug = conf.UBool("debug")
+	// Set up debug level for iris logger
+	if conf.UBool("debug") {
+		srv.Logger().SetLevel("debug")
+	}
 
 	// Regular middlewares
-	engine.Use(middleware.Recover())
+	srv.UseGlobal(recover.New())
 
-	engine.GET("/favicon.ico", func(c echo.Context) error {
-		return c.Redirect(http.StatusMovedPermanently, "/static/images/favicon.ico")
+	// Map app and uuid for every requests
+	srv.UseGlobal(func(ctx iris.Context) {
+		id, err := uuid.NewV4()
+		if err == nil {
+			ctx.Values().Set("uuid", id)
+		}
+		// ctx.Values().Set("app", app)
+		ctx.Next()
 	})
 
-	engine.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: `${method} | ${status} | ${uri} -> ${latency_human}` + "\n",
-	}))
+	// Favicon
+	srv.Favicon("./data/static/images/favicon.ico")
 
 	// Initialize the application
 	app := &App{
 		Conf:   conf,
-		Engine: engine,
-		API:    &API{},
+		Server: srv,
 		React: NewReact(
 			conf.UString("duktape.path"),
 			conf.UBool("debug"),
-			engine,
+			srv,
 		),
 	}
 
-	// Map app and uuid for every requests
-	app.Engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			c.Set("app", app)
-			id, _ := uuid.NewV4()
-			c.Set("uuid", id)
-			return next(c)
-		}
-	})
+	// Serve static via bindata
+	srv.StaticEmbedded("/static", "./data/static", Asset, AssetNames)
+
+	// Request Logger with columns
+	srv.Use(logger.New(logger.Config{
+		Columns: true,
+		Status:  true,
+		IP:      true,
+		Method:  true,
+		Path:    true,
+	}))
+
+	api := NewAPI(app)
 
 	// Bind api hadling for URL api.prefix
-	app.API.Bind(
-		app.Engine.Group(
+	api.Bind(
+		app.Server.Party(
 			app.Conf.UString("api.prefix"),
 		),
 	)
 
-	// Create file http server from bindata
-	fileServerHandler := http.FileServer(&assetfs.AssetFS{
-		Asset:     Asset,
-		AssetDir:  AssetDir,
-		AssetInfo: AssetInfo,
-	})
-
-	// Serve static via bindata and handle via react app
-	// in case when static file was not found
-	app.Engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// execute echo handlers chain
-			err := next(c)
-			// if page(handler) for url/method not found
-			if err != nil {
-				httpErr, ok := err.(*echo.HTTPError)
-				if ok && httpErr.Code == http.StatusNotFound {
-					// check if file exists
-					// omit first `/`
-					if _, err := Asset(c.Request().URL.Path[1:]); err == nil {
-						fileServerHandler.ServeHTTP(
-							c.Response().Writer,
-							c.Request())
-						return nil
-					}
-					// if static file not found handle request via react application
-					return app.React.Handle(c)
-				}
-			}
-			// Move further if err is not `Not Found`
-			return err
-		}
-	})
+	// Handle via react app
+	//
+	// Registers / and /anything/here on GET and HEAD http methods.
+	// srv.HandleMany("GET HEAD", "/ /{p:path}", app.React.Handle)
+	// Or:
+	//
+	// handle root with react
+	srv.Get("/", app.React.Handle)
+	// handle anything expect /static/ and /api/v1/conf with react as well
+	srv.Get("/{p:path}", app.React.Handle)
 
 	return app
 }
 
 // Run runs the app
 func (app *App) Run() {
-	Must(app.Engine.Start(":" + app.Conf.UString("port")))
-}
-
-// Template is custom renderer for Echo, to render html from bindata
-type Template struct {
-	templates *template.Template
-}
-
-// NewTemplate creates a new template
-func NewTemplate() *Template {
-	return &Template{
-		templates: binhtml.New(Asset, AssetDir).MustLoadDirectory("templates"),
-	}
-}
-
-// Render renders template
-func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
+	Must(app.Server.Run(
+		iris.Addr(":"+app.Conf.UString("port")),
+		iris.WithoutVersionChecker,
+		iris.WithoutServerError(iris.ErrServerClosed)))
 }
 
 // AppOptions is options struct

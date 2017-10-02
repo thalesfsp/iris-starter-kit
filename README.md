@@ -1,6 +1,6 @@
-# go-starter-kit [![wercker status](https://app.wercker.com/status/cd5a782c425b1feb06844dcc701e528c/s/master "wercker status")](https://app.wercker.com/project/bykey/cd5a782c425b1feb06844dcc701e528c) [![Join the chat at https://gitter.im/olebedev/go-starter-kit](https://img.shields.io/gitter/room/nwjs/nw.js.svg?maxAge=2592000&style=plastic)](https://gitter.im/olebedev/go-starter-kit?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+# iris-starter-kit
 
-> This project contains a quick starter kit for **Facebook React** Single Page Apps with **Golang** server side render via goja javascript engine, implemented in pure Golang and also with a set of useful features for rapid development of efficient applications.
+This project contains a quick starter kit for **Facebook React** Single Page Apps with **Golang** server side render via goja javascript engine, implemented in pure Golang and also with a set of useful features for rapid development of efficient applications.
 
 ## What it contains?
 
@@ -9,10 +9,8 @@
 * title, Open Graph and other domain-specific meta tags render for each page at the server and at the client
 * server side redirect
 * embedding static files into artefact via bindata
-* high performance [echo](https://github.com/labstack/echo) framework
+* highest performance [iris](https://github.com/kataras/iris) framework
 * advanced cli via [cli](https://github.com/codegangsta/cli)
-* Makefile based project
-* one(!) terminal window process for development
 * routing via [react-router](https://github.com/reactjs/react-router)
 * ES6 & JSX via [babel-loader](https://github.com/babel/babel-loader) with minimal runtime dependency footprint
 * [redux](https://rackt.org/redux/) as state container
@@ -27,14 +25,14 @@
 
 * [golang](https://golang.org/)
 * [node.js](https://nodejs.org/) with [yarn](https://yarnpkg.com)
-* [GNU make](https://www.gnu.org/software/make/)
 
-Note that probably not works at windows.
+Note that works even on Windows.
 
 ## Project structure
 
-##### The server's entry point
-```
+### The server's entry point
+
+```bash
 $ tree server
 server
 ├── api.go
@@ -51,11 +49,11 @@ server
 
 The `./server/` is flat golang package.
 
-##### The client's entry point
+### The client's entry point
 
 It's simple React application
 
-```
+```bash
 $ tree client
 client
 ├── actions.js
@@ -89,29 +87,34 @@ client
 
 The client app will be compiled into `server/data/static/build/`.  Then it will be embedded into go package via _go-bindata_. After that the package will be compiled into binary.
 
-**Convention**: javascript app should declare [_main_](https://github.com/olebedev/go-starter-kit/blob/master/client/index.js#L4) function right in the global namespace. It will used to render the app at the server side.
+**Convention**: javascript app should declare [_main_](https://github.com/kataras/iris-starter-kit/blob/master/client/index.js#L4) function right in the global namespace. It will used to render the app at the server side.
 
 ## Install
 
 Clone the repo:
 
-```
-$ git clone git@github.com:olebedev/go-starter-kit.git $GOPATH/src/github.com/<username>/<project>
+```bash
+$ git clone git@github.com:kataras/iris-starter-kit.git $GOPATH/src/github.com/<username>/<project>
 $ cd $GOPATH/src/github.com/<username>/<project>
 ```
 
 Install dependencies:
 
-```
-$ make install
+```bash
+$ npm install
+$ webpack
+$ cd server && go get ./... && cd ../
 ```
 
 ## Run development
 
 Start dev server:
 
-```
-$ make serve
+```bash
+$ cd server
+$ go-bindata ./data/...
+$ go build
+$ server run # ./server.exe run
 ```
 
 that's it. Open [http://localhost:5001/](http://localhost:5001/)(if you use default port) at your browser. Now you ready to start coding your awesome project.
@@ -121,4 +124,5 @@ that's it. Open [http://localhost:5001/](http://localhost:5001/)(if you use defa
 Install dependencies and type `NODE_ENV=production make build`. This rule is producing webpack build and regular golang build after that. Result you can find at `$GOPATH/bin`. Note that the binary will be named **as the current project directory**.
 
 ## License
-MIT
+
+As https://github.com/olebedev/go-starter-kit says; MIT
