@@ -4,7 +4,7 @@ This project contains a quick starter kit for **Facebook React** Single Page App
 
 ## What it contains?
 
-* server side render via [goja](https://github.com/dop251/goja)
+* server side render via [iris](https://github.com/kataras/iris)
 * api requests between your react application and server side application directly  via [fetch polyfill](https://github.com/olebedev/gojax/tree/master/fetch)
 * title, Open Graph and other domain-specific meta tags render for each page at the server and at the client
 * server side redirect
@@ -94,7 +94,7 @@ The client app will be compiled into `server/data/static/build/`.  Then it will 
 Clone the repo:
 
 ```bash
-$ git clone git@github.com:kataras/iris-starter-kit.git $GOPATH/src/github.com/<username>/<project>
+$ git clone https://github.com/kataras/iris-starter-kit.git $GOPATH/src/github.com/<username>/<project>
 $ cd $GOPATH/src/github.com/<username>/<project>
 ```
 
